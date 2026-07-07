@@ -12,7 +12,8 @@ const state = {
   isLoading: false,
   retryCountdown: 0,
   retryInterval: null,
-  currentErrorMessage: ''
+  currentErrorMessage: '',
+  performanceChartInstance: null
 };
 
 // ============================================================================
@@ -64,6 +65,8 @@ const resPeriodLabel = document.getElementById('resPeriodLabel');
 const resThresholdLabel = document.getElementById('resThresholdLabel');
 const resVerdictBadge = document.getElementById('resVerdictBadge');
 const resPortfolioSummary = document.getElementById('resPortfolioSummary');
+const performanceChart = document.getElementById('performanceChart');
+const tickerToggles = document.getElementById('tickerToggles');
 const heatmapCanvas = document.getElementById('heatmapCanvas');
 const groupsGrid = document.getElementById('groupsGrid');
 const resDiversificationAssessment = document.getElementById('resDiversificationAssessment');
@@ -381,6 +384,11 @@ function renderResults(data) {
   // Render portfolio summary
   resPortfolioSummary.textContent = data.geminiAnalysis.portfolioHealthSummary || 'N/A';
 
+  // Render performance chart
+  if (data.priceHistory) {
+    renderPerformanceChart(data);
+  }
+
   // Render heatmap
   setTimeout(() => {
     drawHeatmap(heatmapCanvas, data.tickers, data.matrix);
@@ -402,6 +410,192 @@ function renderResults(data) {
   renderCitations(data.geminiAnalysis.citations || []);
 
   // Re-initialize Lucide icons
+  lucide.createIcons();
+}
+
+// ============================================================================
+// Performance Chart Rendering (Price Performance)
+// ============================================================================
+
+function renderPerformanceChart(data) {
+  // Destroy previous chart instance if it exists
+  if (state.performanceChartInstance) {
+    state.performanceChartInstance.destroy();
+  }
+
+  const { tickers, priceHistory } = data;
+  const { dates, cumulative } = priceHistory;
+
+  if (!dates || !cumulative) {
+    console.warn('[Chart] Missing price history data');
+    return;
+  }
+
+  // Color palette - same as groups
+  const colors = [
+    '#6366f1', // Indigo
+    '#10b981', // Emerald
+    '#f59e0b', // Amber
+    '#ef4444', // Red
+    '#8b5cf6', // Violet
+    '#06b6d4'  // Cyan
+  ];
+
+  // Format dates for display (show every Nth date to avoid crowding)
+  const totalDates = dates.length;
+  const showEveryN = Math.max(1, Math.floor(totalDates / 12)); // Show ~12 labels
+  const formattedLabels = dates.map((date, idx) => {
+    if (idx % showEveryN === 0 || idx === totalDates - 1) {
+      const d = new Date(date);
+      return d.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+    }
+    return '';
+  });
+
+  // Prepare datasets
+  const datasets = tickers.map((ticker, idx) => {
+    const color = colors[idx % colors.length];
+    const data = cumulative[ticker] || [];
+
+    return {
+      label: ticker,
+      data: data,
+      borderColor: color,
+      backgroundColor: color + '08', // Very transparent fill
+      borderWidth: 2.5,
+      tension: 0.35,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      pointBackgroundColor: color,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      clip: false,
+      hidden: false // Not hidden by default
+    };
+  });
+
+  // Create chart
+  const ctx = performanceChart.getContext('2d');
+  state.performanceChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: formattedLabels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: false // We'll use custom toggles instead
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: '#f3f4f6',
+          bodyColor: '#e2e8f0',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+          borderWidth: 1,
+          padding: 12,
+          titleFont: { size: 12, weight: 'bold' },
+          bodyFont: { size: 12 },
+          usePointStyle: true,
+          callbacks: {
+            label: function(context) {
+              const value = context.parsed.y;
+              const sign = value >= 0 ? '+' : '';
+              return `${context.dataset.label}: ${sign}${value.toFixed(2)}%`;
+            },
+            afterLabel: function(context) {
+              // Show the actual date on hover
+              const dateStr = dates[context.dataIndex];
+              if (dateStr) {
+                const d = new Date(dateStr);
+                return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+              }
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          grid: {
+            color: 'rgba(255, 255, 255, 0.05)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#9ca3af',
+            font: { size: 11, weight: '500' }
+          }
+        },
+        y: {
+          display: true,
+          position: 'left',
+          grid: {
+            color: 'rgba(255, 255, 255, 0.08)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#9ca3af',
+            font: { size: 11, weight: '500' },
+            callback: function(value) {
+              const sign = value >= 0 ? '+' : '';
+              return sign + value.toFixed(0) + '%';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Render toggle buttons
+  renderTickerToggles(tickers);
+}
+
+function renderTickerToggles(tickers) {
+  tickerToggles.innerHTML = '';
+
+  const colors = [
+    '#6366f1', // Indigo
+    '#10b981', // Emerald
+    '#f59e0b', // Amber
+    '#ef4444', // Red
+    '#8b5cf6', // Violet
+    '#06b6d4'  // Cyan
+  ];
+
+  tickers.forEach((ticker, idx) => {
+    const color = colors[idx % colors.length];
+    const btn = document.createElement('button');
+    btn.className = 'ticker-toggle-btn active';
+    btn.textContent = ticker;
+    btn.style.borderColor = color;
+    btn.style.color = color;
+    btn.setAttribute('data-dataset-index', idx);
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!state.performanceChartInstance) return;
+
+      // Toggle dataset visibility
+      const datasetIndex = parseInt(btn.getAttribute('data-dataset-index'), 10);
+      const isHidden = state.performanceChartInstance.getDatasetMeta(datasetIndex).hidden;
+      state.performanceChartInstance.getDatasetMeta(datasetIndex).hidden = !isHidden;
+
+      // Toggle button class
+      btn.classList.toggle('active');
+
+      state.performanceChartInstance.update();
+    });
+
+    tickerToggles.appendChild(btn);
+  });
+
+  // Re-initialize Lucide icons if needed
   lucide.createIcons();
 }
 

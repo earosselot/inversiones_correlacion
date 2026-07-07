@@ -357,6 +357,15 @@ app.post('/api/generate-correlation', async (req, res) => {
     console.log(`[Grouping] Grouping by threshold ${threshold}...`);
     const { groups, groupCount, isDiversified } = groupByCorrelation(sortedTickers, matrix, threshold);
 
+    // Step 5.5: Calculate cumulative returns for price history visualization
+    console.log(`[Price History] Calculating cumulative returns...`);
+    const cumulativeReturns = {};
+    for (const ticker of successfulTickers) {
+      const prices = aligned[ticker];
+      const basePrice = prices[0];
+      cumulativeReturns[ticker] = prices.map(p => +((p / basePrice - 1) * 100).toFixed(4));
+    }
+
     // Step 6: Get company names
     console.log(`[Company Names] Fetching company names...`);
     const tickerNames = await getCompanyNames(sortedTickers);
@@ -508,7 +517,11 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
       citations,
       createdAt: new Date().toISOString(),
       filename,
-      periodLabel
+      periodLabel,
+      priceHistory: {
+        dates: commonDates,
+        cumulative: cumulativeReturns
+      }
     };
 
     // Step 12: Save to disk

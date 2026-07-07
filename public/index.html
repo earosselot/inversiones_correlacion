@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -165,6 +166,19 @@
           <div class="central-thesis-card card">
             <i data-lucide="quote" class="quote-icon"></i>
             <p id="resPortfolioSummary">Resumen de salud del portafolio...</p>
+          </div>
+
+          <!-- Performance Chart Card -->
+          <div class="card performance-card" id="performanceCard">
+            <div class="performance-header">
+              <h3><i data-lucide="trending-up"></i> Retorno Acumulado</h3>
+              <div class="ticker-toggles" id="tickerToggles">
+                <!-- JS popula los botones de toggle -->
+              </div>
+            </div>
+            <div class="performance-chart-container">
+              <canvas id="performanceChart"></canvas>
+            </div>
           </div>
 
           <!-- Heatmap Card -->
