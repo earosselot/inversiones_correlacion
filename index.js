@@ -360,11 +360,15 @@ app.post('/api/generate-correlation', async (req, res) => {
     // Step 5.5: Calculate cumulative returns for price history visualization
     console.log(`[Price History] Calculating cumulative returns...`);
     const cumulativeReturns = {};
-    for (const ticker of successfulTickers) {
+    // Use sortedTickers to ensure consistency with the correlation matrix tickers
+    for (const ticker of sortedTickers) {
       const prices = aligned[ticker];
-      const basePrice = prices[0];
-      cumulativeReturns[ticker] = prices.map(p => +((p / basePrice - 1) * 100).toFixed(4));
+      if (prices && prices.length > 0) {
+        const basePrice = prices[0];
+        cumulativeReturns[ticker] = prices.map(p => +((p / basePrice - 1) * 100).toFixed(4));
+      }
     }
+    console.log(`[Price History] Cumulative returns calculated for ${Object.keys(cumulativeReturns).length} tickers`);
 
     // Step 6: Get company names
     console.log(`[Company Names] Fetching company names...`);
