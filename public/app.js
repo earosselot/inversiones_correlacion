@@ -418,18 +418,28 @@ function renderResults(data) {
 // ============================================================================
 
 function renderPerformanceChart(data) {
+  console.log('[Chart] Starting renderPerformanceChart with data:', { tickers: data.tickers, hasHistory: !!data.priceHistory });
+
   // Destroy previous chart instance if it exists
   if (state.performanceChartInstance) {
     state.performanceChartInstance.destroy();
   }
 
   const { tickers, priceHistory } = data;
+
+  if (!priceHistory) {
+    console.warn('[Chart] No priceHistory in data');
+    return;
+  }
+
   const { dates, cumulative } = priceHistory;
 
   if (!dates || !cumulative) {
-    console.warn('[Chart] Missing price history data');
+    console.warn('[Chart] Missing price history data. dates:', !!dates, 'cumulative:', !!cumulative);
     return;
   }
+
+  console.log('[Chart] Price history loaded. Dates:', dates.length, 'Tickers:', Object.keys(cumulative));
 
   // Color palette - same as groups
   const colors = [
@@ -475,85 +485,99 @@ function renderPerformanceChart(data) {
   });
 
   // Create chart
-  const ctx = performanceChart.getContext('2d');
-  state.performanceChartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: formattedLabels,
-      datasets: datasets
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      interaction: {
-        mode: 'index',
-        intersect: false
+  try {
+    console.log('[Chart] Getting canvas context...');
+    if (!performanceChart) {
+      console.error('[Chart] performanceChart element not found in DOM');
+      return;
+    }
+
+    const ctx = performanceChart.getContext('2d');
+    console.log('[Chart] Canvas context obtained. Creating chart instance...');
+
+    state.performanceChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: formattedLabels,
+        datasets: datasets
       },
-      plugins: {
-        legend: {
-          display: false // We'll use custom toggles instead
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: {
+          mode: 'index',
+          intersect: false
         },
-        tooltip: {
-          backgroundColor: 'rgba(15, 23, 42, 0.95)',
-          titleColor: '#f3f4f6',
-          bodyColor: '#e2e8f0',
-          borderColor: 'rgba(255, 255, 255, 0.2)',
-          borderWidth: 1,
-          padding: 12,
-          titleFont: { size: 12, weight: 'bold' },
-          bodyFont: { size: 12 },
-          usePointStyle: true,
-          callbacks: {
-            label: function(context) {
-              const value = context.parsed.y;
-              const sign = value >= 0 ? '+' : '';
-              return `${context.dataset.label}: ${sign}${value.toFixed(2)}%`;
+        plugins: {
+          legend: {
+            display: false // We'll use custom toggles instead
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleColor: '#f3f4f6',
+            bodyColor: '#e2e8f0',
+            borderColor: 'rgba(255, 255, 255, 0.2)',
+            borderWidth: 1,
+            padding: 12,
+            titleFont: { size: 12, weight: 'bold' },
+            bodyFont: { size: 12 },
+            usePointStyle: true,
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed.y;
+                const sign = value >= 0 ? '+' : '';
+                return `${context.dataset.label}: ${sign}${value.toFixed(2)}%`;
+              },
+              afterLabel: function(context) {
+                // Show the actual date on hover
+                const dateStr = dates[context.dataIndex];
+                if (dateStr) {
+                  const d = new Date(dateStr);
+                  return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+                }
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: 'rgba(255, 255, 255, 0.05)',
+              drawBorder: false
             },
-            afterLabel: function(context) {
-              // Show the actual date on hover
-              const dateStr = dates[context.dataIndex];
-              if (dateStr) {
-                const d = new Date(dateStr);
-                return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+            ticks: {
+              color: '#9ca3af',
+              font: { size: 11, weight: '500' }
+            }
+          },
+          y: {
+            display: true,
+            position: 'left',
+            grid: {
+              color: 'rgba(255, 255, 255, 0.08)',
+              drawBorder: false
+            },
+            ticks: {
+              color: '#9ca3af',
+              font: { size: 11, weight: '500' },
+              callback: function(value) {
+                const sign = value >= 0 ? '+' : '';
+                return sign + value.toFixed(0) + '%';
               }
             }
           }
         }
-      },
-      scales: {
-        x: {
-          display: true,
-          grid: {
-            color: 'rgba(255, 255, 255, 0.05)',
-            drawBorder: false
-          },
-          ticks: {
-            color: '#9ca3af',
-            font: { size: 11, weight: '500' }
-          }
-        },
-        y: {
-          display: true,
-          position: 'left',
-          grid: {
-            color: 'rgba(255, 255, 255, 0.08)',
-            drawBorder: false
-          },
-          ticks: {
-            color: '#9ca3af',
-            font: { size: 11, weight: '500' },
-            callback: function(value) {
-              const sign = value >= 0 ? '+' : '';
-              return sign + value.toFixed(0) + '%';
-            }
-          }
-        }
       }
-    }
-  });
+    });
 
-  // Render toggle buttons
-  renderTickerToggles(tickers);
+    console.log('[Chart] Chart instance created successfully');
+
+    // Render toggle buttons
+    renderTickerToggles(tickers);
+  } catch (error) {
+    console.error('[Chart] Error creating chart:', error);
+  }
 }
 
 function renderTickerToggles(tickers) {
@@ -932,7 +956,9 @@ async function loadHistory() {
           <div class="history-item-date">${new Date(analysis.createdAt).toLocaleDateString('es-ES')}</div>
         </div>
       `;
-      item.classList.add(isActive);
+      if (isActive) {
+        item.classList.add(isActive);
+      }
 
       historyList.appendChild(item);
     });
