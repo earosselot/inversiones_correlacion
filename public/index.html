@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inversiones Correlacion - Analisis Inteligente</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="main-header">
+      <div class="logo">
+        <i data-lucide="git-branch" class="logo-icon"></i>
+        <h1>Inversiones<span>Correlacion</span></h1>
+      </div>
+      <div class="api-key-container">
+        <label for="apiKey">Gemini API Key:</label>
+        <div class="input-wrapper">
+          <i data-lucide="key" class="input-icon"></i>
+          <input type="password" id="apiKey" placeholder="AIzaSy..." autocomplete="off">
+          <button id="toggleApiKey" title="Mostrar/Ocultar" type="button"><i data-lucide="eye"></i></button>
+          <button id="helpApiKey" title="¿Cómo obtener API Key?" type="button"><i data-lucide="help-circle"></i></button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Grid Layout -->
+    <main class="main-content">
+      <!-- Sidebar (Inputs & History) -->
+      <aside class="sidebar">
+        <div class="card search-card">
+          <h2><i data-lucide="search"></i> Nuevo Analisis</h2>
+          <form id="correlationForm">
+            <div class="form-group">
+              <label for="tickers">Tickers de Activos:</label>
+              <textarea
+                id="tickers"
+                class="ticker-textarea"
+                placeholder="ej. AAPL, MSFT, GLD, TLT, BTC-USD"
+                required></textarea>
+              <small class="form-help">Ingresa tickers separados por comas (minimo 2, maximo 20)</small>
+            </div>
+
+            <div class="form-group">
+              <label for="periodSelect">Período Histórico:</label>
+              <select id="periodSelect" class="period-select">
+                <option value="3m">3 meses</option>
+                <option value="6m">6 meses</option>
+                <option value="1y" selected>1 año</option>
+                <option value="2y">2 años</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="threshold">Umbral de Correlacion:</label>
+              <div class="threshold-group">
+                <input
+                  type="range"
+                  id="threshold"
+                  class="threshold-slider"
+                  min="0.1"
+                  max="0.99"
+                  step="0.05"
+                  value="0.7">
+                <span class="threshold-value" id="thresholdValue">0.70</span>
+              </div>
+              <small class="form-help">Activos con |correlación| ≥ umbral se agrupan juntos</small>
+            </div>
+
+            <div class="form-group">
+              <label for="modelSelect">Modelo de IA:</label>
+              <select id="modelSelect" class="model-select">
+                <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Recomendado)</option>
+                <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+              </select>
+              <small class="form-help">Si un modelo falla por cuota, prueba otro.</small>
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn btn-primary btn-block">
+              <span>Analizar Correlaciones</span>
+              <i data-lucide="sparkles"></i>
+            </button>
+          </form>
+        </div>
+
+        <div class="card history-card">
+          <h2><i data-lucide="history"></i> Analisis Guardados</h2>
+          <div id="historyList" class="history-list">
+            <div class="loading-history">Cargando analisis anteriores...</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Dashboard Output -->
+      <section class="dashboard">
+        <!-- Empty State -->
+        <div id="emptyState" class="dashboard-state empty-state">
+          <div class="glowing-circle">
+            <i data-lucide="activity" class="glowing-icon"></i>
+          </div>
+          <h2>Listo para Analizar</h2>
+          <p>Ingresa tickers a la izquierda para generar un análisis de correlación profundo.</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="dashboard-state loading-state hidden">
+          <div class="spinner-container">
+            <div class="double-bounce1"></div>
+            <div class="double-bounce2"></div>
+          </div>
+          <h2>Analizando Portafolio...</h2>
+          <p id="loadingMessage">Obteniendo datos de mercado...</p>
+
+          <div class="progress-steps">
+            <div class="step active" id="step-market"><i data-lucide="check-circle-2"></i> Datos de Mercado</div>
+            <div class="step" id="step-correlation"><i data-lucide="circle"></i> Calculando Correlaciones</div>
+            <div class="step" id="step-grouping"><i data-lucide="circle"></i> Agrupando Activos</div>
+            <div class="step" id="step-gemini"><i data-lucide="circle"></i> Análisis con IA</div>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="dashboard-state error-state hidden">
+          <div class="error-icon">
+            <i data-lucide="alert-triangle"></i>
+          </div>
+          <h2>Error de Conexión</h2>
+          <p id="errorMessage" class="error-text">Ocurrió un error inesperado.</p>
+
+          <div class="retry-container">
+            <p id="retryCountdown" class="countdown-text">Reintentando automáticamente en 20s...</p>
+            <button id="retryBtn" class="btn btn-secondary mt-4">
+              <i data-lucide="refresh-cw"></i>
+              <span>Reintentar Ahora</span>
+            </button>
+            <button id="cancelRetryBtn" class="btn btn-ghost mt-4">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- Results Dashboard -->
+        <div id="resultsDashboard" class="results-dashboard hidden">
+          <!-- Result Header -->
+          <div class="result-header card">
+            <div class="header-info">
+              <h2>Análisis de Correlación</h2>
+              <div class="header-meta">
+                <span class="meta-item"><strong id="resTickersCount">5</strong> activos analizados</span>
+                <span class="meta-item">Período: <strong id="resPeriodLabel">1 año</strong></span>
+                <span class="meta-item">Umbral: <strong id="resThresholdLabel">0.70</strong></span>
+              </div>
+            </div>
+            <div class="verdict-container">
+              <span class="verdict-label">Veredicto de Diversificación</span>
+              <div class="verdict-badge" id="resVerdictBadge">DIVERSIFICADO</div>
+            </div>
+          </div>
+
+          <!-- Portfolio Health Summary -->
+          <div class="central-thesis-card card">
+            <i data-lucide="quote" class="quote-icon"></i>
+            <p id="resPortfolioSummary">Resumen de salud del portafolio...</p>
+          </div>
+
+          <!-- Heatmap Card -->
+          <div class="card heatmap-card" id="heatmapCard">
+            <h3><i data-lucide="grid-3x3"></i> Matriz de Correlación</h3>
+            <div class="heatmap-container">
+              <canvas id="heatmapCanvas"></canvas>
+            </div>
+            <div class="heatmap-legend">
+              <div class="legend-item">
+                <div class="legend-color" style="background: rgb(30, 64, 175);"></div>
+                <span>Correlación Negativa (-1.0)</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: rgb(248, 250, 252);"></div>
+                <span>Sin Correlación (0.0)</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: rgb(220, 38, 38);"></div>
+                <span>Correlación Positiva (+1.0)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Groups Visualization -->
+          <div class="card groups-card" id="groupsCard">
+            <h3><i data-lucide="layers"></i> Grupos de Activos</h3>
+            <div class="groups-grid" id="groupsGrid">
+              <!-- JS populates this -->
+            </div>
+          </div>
+
+          <!-- Diversification Assessment -->
+          <div class="card assessment-card" id="assessmentCard">
+            <h3><i data-lucide="bar-chart-2"></i> Evaluación de Diversificación</h3>
+            <p id="resDiversificationAssessment">Evaluacion detallada...</p>
+          </div>
+
+          <!-- Recommendations -->
+          <div class="card recommendations-card" id="recommendationsCard">
+            <h3><i data-lucide="lightbulb"></i> Recomendaciones</h3>
+            <div class="recommendations-list" id="recommendationsList">
+              <!-- JS populates this -->
+            </div>
+          </div>
+
+          <!-- Risk Warnings -->
+          <div class="card warnings-card" id="warningsCard">
+            <h3><i data-lucide="alert-circle"></i> Advertencias de Riesgo</h3>
+            <div class="warnings-list" id="warningsList">
+              <!-- JS populates this -->
+            </div>
+          </div>
+
+          <!-- Citations -->
+          <div class="card citations-card" id="citationsCard">
+            <h3><i data-lucide="link"></i> Fuentes Consultadas</h3>
+            <div class="citations-grid" id="citationsList">
+              <!-- JS populates this -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal de Ayuda para API Key -->
+  <div id="apiKeyModal" class="modal hidden">
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Cómo Obtener tu Gemini API Key</h2>
+        <button class="modal-close" id="closeApiKeyModal" type="button"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <ol class="steps-list">
+          <li>
+            <span class="step-number">1</span>
+            <div class="step-content">
+              <p class="step-title">Accede a Google AI Studio</p>
+              <p class="step-desc">Ve a <a href="https://aistudio.google.com/apikey" target="_blank" class="modal-link">aistudio.google.com/apikey</a></p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">2</span>
+            <div class="step-content">
+              <p class="step-title">Inicia sesión con tu cuenta de Google</p>
+              <p class="step-desc">Si no tienes una, deberás crear una primero. Es gratis.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">3</span>
+            <div class="step-content">
+              <p class="step-title">Haz clic en "Create API Key"</p>
+              <p class="step-desc">Se abrirá un diálogo para crear una nueva clave.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">4</span>
+            <div class="step-content">
+              <p class="step-title">Copia tu API Key</p>
+              <p class="step-desc">Google generará una clave única. Haz clic en el icono de copiar.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">5</span>
+            <div class="step-content">
+              <p class="step-title">Pégala en el campo de arriba</p>
+              <p class="step-desc">Vuelve a esta aplicación y pega tu API Key.</p>
+            </div>
+          </li>
+        </ol>
+        <div class="modal-note">
+          <i data-lucide="alert-circle"></i>
+          <div>
+            <p><strong>Nota importante:</strong> Mantén tu API Key confidencial. No la compartas con otros.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
