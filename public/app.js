@@ -503,7 +503,7 @@ function renderPerformanceChart(data) {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         interaction: {
           mode: 'index',
           intersect: false
