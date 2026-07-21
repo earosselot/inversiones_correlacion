@@ -73,6 +73,7 @@ const resDiversificationAssessment = document.getElementById('resDiversification
 const recommendationsList = document.getElementById('recommendationsList');
 const warningsList = document.getElementById('warningsList');
 const citationsList = document.getElementById('citationsList');
+const clustersGrid = document.getElementById('clustersGrid');
 
 // ============================================================================
 // Initialization
@@ -405,6 +406,9 @@ function renderResults(data) {
 
   // Render warnings
   renderWarnings(data.geminiAnalysis.riskWarnings || []);
+
+  // Render correlation clusters
+  renderClusters(data.geminiAnalysis.correlationClusters || []);
 
   // Render citations
   renderCitations(data.geminiAnalysis.citations || []);
@@ -880,6 +884,96 @@ function renderWarnings(warnings) {
     item.className = 'warning-item';
     item.innerHTML = `<p>${warning}</p>`;
     warningsList.appendChild(item);
+  });
+}
+
+// ============================================================================
+// Correlation Clusters Rendering (Numerical + Qualitative)
+// ============================================================================
+
+function renderClusters(clusters) {
+  clustersGrid.innerHTML = '';
+
+  if (!clusters || clusters.length === 0) {
+    clustersGrid.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No hay datos de agrupacion disponibles</p>';
+    return;
+  }
+
+  const typeConfig = {
+    'numerico': {
+      label: 'Numerica',
+      icon: 'hash',
+      color: '#6366f1',
+      description: 'Alta correlacion estadistica'
+    },
+    'cualitativo': {
+      label: 'Cualitativa',
+      icon: 'building-2',
+      color: '#f59e0b',
+      description: 'Mismo sector/industria'
+    },
+    'mixto': {
+      label: 'Mixta',
+      icon: 'blend',
+      color: '#10b981',
+      description: 'Estadistica + sectorial'
+    }
+  };
+
+  clusters.forEach((cluster) => {
+    const config = typeConfig[cluster.clusterType] || typeConfig['mixto'];
+
+    const card = document.createElement('div');
+    card.className = 'cluster-card';
+    card.style.borderLeftColor = config.color;
+
+    // Header with cluster name and type badge
+    const header = document.createElement('div');
+    header.className = 'cluster-header';
+    header.innerHTML = `
+      <h4 class="cluster-name">${cluster.clusterName}</h4>
+      <div class="cluster-badges">
+        <span class="cluster-type-badge" style="background: ${config.color}15; color: ${config.color}; border: 1px solid ${config.color}30;">
+          <i data-lucide="${config.icon}"></i>
+          ${config.label}
+        </span>
+      </div>
+    `;
+    card.appendChild(header);
+
+    // Tickers
+    const tickersContainer = document.createElement('div');
+    tickersContainer.className = 'cluster-tickers';
+    cluster.tickers.forEach(ticker => {
+      const chip = document.createElement('span');
+      chip.className = 'ticker-chip';
+      chip.style.background = `${config.color}15`;
+      chip.style.borderColor = `${config.color}30`;
+      chip.style.color = config.color;
+      chip.textContent = ticker;
+      tickersContainer.appendChild(chip);
+    });
+    card.appendChild(tickersContainer);
+
+    // Correlation metric
+    const metric = document.createElement('div');
+    metric.className = 'cluster-metric';
+    const corrValue = typeof cluster.avgNumericalCorrelation === 'number'
+      ? cluster.avgNumericalCorrelation.toFixed(2)
+      : 'N/A';
+    metric.innerHTML = `
+      <span class="metric-label">Correlacion numerica promedio:</span>
+      <span class="metric-value" style="color: ${config.color}">${corrValue}</span>
+    `;
+    card.appendChild(metric);
+
+    // Reasoning
+    const reasoning = document.createElement('p');
+    reasoning.className = 'cluster-reasoning';
+    reasoning.textContent = cluster.reasoning;
+    card.appendChild(reasoning);
+
+    clustersGrid.appendChild(card);
   });
 }
 

@@ -209,6 +209,22 @@ function generateMarkdown(ticker, data) {
   });
   md += `\n`;
 
+  if (data.geminiAnalysis.correlationClusters && data.geminiAnalysis.correlationClusters.length > 0) {
+    md += `## Agrupacion por Correlacion Numerica y Cualitativa\n\n`;
+    data.geminiAnalysis.correlationClusters.forEach((cluster, idx) => {
+      const typeLabel = {
+        'numerico': 'Numerica',
+        'cualitativo': 'Cualitativa',
+        'mixto': 'Mixta'
+      }[cluster.clusterType] || cluster.clusterType;
+      md += `### ${cluster.clusterName}\n`;
+      md += `**Activos:** ${cluster.tickers.join(', ')}\n`;
+      md += `**Tipo de correlacion:** ${typeLabel}\n`;
+      md += `**Correlacion numerica promedio:** ${cluster.avgNumericalCorrelation.toFixed(2)}\n\n`;
+      md += `${cluster.reasoning}\n\n`;
+    });
+  }
+
   if (data.citations && data.citations.length > 0) {
     md += `## Fuentes Consultadas\n`;
     data.citations.forEach(citation => {
@@ -412,6 +428,29 @@ Tu tarea es generar un análisis narrativo completo que incluya:
 
 5. **riskWarnings**: Array de 1-3 advertencias sobre riesgos del portafolio. Siempre incluir que "las correlaciones cambian en el tiempo y en crisis tienden a 1".
 
+6. **correlationClusters**: Agrupa TODOS los activos del portafolio considerando DOS dimensiones:
+   - **Correlación numérica**: Basada en los coeficientes de la matriz de Pearson proporcionada.
+   - **Correlación cualitativa/sectorial**: Basada en tu conocimiento del sector, industria, geografía, tipo de activo o factores de riesgo comunes de cada empresa/activo. Por ejemplo, AAPL y MSFT pueden no tener una correlación numérica alta, pero ambas pertenecen al sector tecnológico y se verían afectadas similarmente por una crisis en ese sector.
+
+   Cada cluster debe representar un grupo temático (ej: "Tecnología", "Commodities", "Renta Fija", "Crypto", "Mercados Emergentes", etc.).
+   IMPORTANTE: Cada ticker debe aparecer en al menos un cluster. Un ticker puede aparecer en más de un cluster si tiene exposición a múltiples sectores.
+
+   Retorna array con esta estructura:
+   [
+     {
+       "clusterName": "Nombre del cluster (ej: Sector Tecnológico)",
+       "tickers": ["AAPL", "MSFT", "NVDA"],
+       "avgNumericalCorrelation": 0.75,
+       "clusterType": "mixto",
+       "reasoning": "Explicación de por qué estos activos están agrupados, mencionando tanto la correlación numérica como la cualitativa."
+     }
+   ]
+
+   Donde clusterType puede ser:
+   - "numerico": Los activos tienen alta correlación numérica (≥ umbral) Y pertenecen al mismo sector.
+   - "cualitativo": Los activos NO tienen alta correlación numérica pero comparten sector, industria o factores de riesgo similares. Esto es clave para detectar "falsa diversificación".
+   - "mixto": Algunos pares dentro del grupo tienen alta correlación numérica y otros no, pero todos comparten factores cualitativos comunes.
+
 Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
 {
   "portfolioHealthSummary": "string",
@@ -420,7 +459,16 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
   ],
   "diversificationAssessment": "string",
   "recommendations": ["string"],
-  "riskWarnings": ["string"]
+  "riskWarnings": ["string"],
+  "correlationClusters": [
+    {
+      "clusterName": "string",
+      "tickers": ["string"],
+      "avgNumericalCorrelation": 0.0,
+      "clusterType": "numerico | cualitativo | mixto",
+      "reasoning": "string"
+    }
+  ]
 }
 `;
 
